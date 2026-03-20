@@ -193,6 +193,16 @@ function buildVolumeMounts(
     });
   }
 
+  // nano-broker UDS socket (for API token requests from the container)
+  const nanoBrokerDir = '/var/run/nano-broker';
+  if (fs.existsSync(nanoBrokerDir)) {
+    mounts.push({
+      hostPath: nanoBrokerDir,
+      containerPath: '/var/run/nano-broker',
+      readonly: false,
+    });
+  }
+
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC
   const groupIpcDir = resolveGroupIpcPath(group.folder);
