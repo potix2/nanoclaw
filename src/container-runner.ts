@@ -166,55 +166,6 @@ function buildVolumeMounts(
   });
 
   // nano-broker UDS socket (for API token requests from the container)
-  // macOS: $TMPDIR/nano-broker, Linux: $XDG_RUNTIME_DIR/nano-broker (fallback: /tmp/nano-broker)
-  const tmpDir = process.env.TMPDIR || '/tmp';
-  const xdgRuntimeDir = process.env.XDG_RUNTIME_DIR;
-  const nanoBrokerCandidates = [
-    path.join(tmpDir, 'nano-broker'),
-    ...(xdgRuntimeDir ? [path.join(xdgRuntimeDir, 'nano-broker')] : []),
-    '/tmp/nano-broker',
-  ];
-  const nanoBrokerDir = nanoBrokerCandidates.find((d) => fs.existsSync(d));
-  if (nanoBrokerDir) {
-    mounts.push({
-      hostPath: nanoBrokerDir,
-      containerPath: '/tmp/nano-broker',
-      readonly: false,
-    });
-  }
-
-  // nbctl CLI binary (nano-broker client for token requests)
-  // On macOS, prefer the container-native (Linux) binary over the host (darwin) binary.
-  const nbctlBinary = fs.existsSync(NBCTL_CONTAINER_BIN_PATH)
-    ? NBCTL_CONTAINER_BIN_PATH
-    : NBCTL_PATH;
-  if (fs.existsSync(nbctlBinary)) {
-    mounts.push({
-      hostPath: nbctlBinary,
-      containerPath: '/usr/local/bin/nbctl',
-      readonly: true,
-    });
-  }
-
-  // Google Calendar credentials (for Calendar MCP inside the container)
-  const calendarOauthDir = path.join(homeDir, '.google-calendar-mcp');
-  if (fs.existsSync(calendarOauthDir)) {
-    mounts.push({
-      hostPath: calendarOauthDir,
-      containerPath: '/home/node/.google-calendar-mcp',
-      readonly: false,
-    });
-  }
-  const calendarTokenDir = path.join(homeDir, '.config', 'google-calendar-mcp');
-  if (fs.existsSync(calendarTokenDir)) {
-    mounts.push({
-      hostPath: calendarTokenDir,
-      containerPath: '/home/node/.config/google-calendar-mcp',
-      readonly: false,
-    });
-  }
-
-  // nano-broker UDS socket (for API token requests from the container)
   const nanoBrokerDir = '/var/run/nano-broker';
   if (fs.existsSync(nanoBrokerDir)) {
     mounts.push({
