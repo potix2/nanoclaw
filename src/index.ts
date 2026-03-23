@@ -662,7 +662,10 @@ async function main(): Promise<void> {
       await channel.connect();
       channels.push(channel);
     } catch (err) {
-      logger.error({ channel: channelName, err }, 'Channel failed to connect — skipping');
+      logger.error(
+        { channel: channelName, err },
+        'Channel failed to connect — skipping',
+      );
     }
   }
   if (channels.length === 0) {
