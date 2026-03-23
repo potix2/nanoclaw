@@ -4,7 +4,6 @@
  */
 import { ChildProcess, exec, spawn } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 
 import {
@@ -163,35 +162,6 @@ function buildVolumeMounts(
     containerPath: '/home/node/.claude',
     readonly: false,
   });
-
-  // Gmail credentials directory (for Gmail MCP inside the container)
-  const homeDir = os.homedir();
-  const gmailDir = path.join(homeDir, '.gmail-mcp');
-  if (fs.existsSync(gmailDir)) {
-    mounts.push({
-      hostPath: gmailDir,
-      containerPath: '/home/node/.gmail-mcp',
-      readonly: false, // MCP may need to refresh OAuth tokens
-    });
-  }
-
-  // Google Calendar credentials (for Calendar MCP inside the container)
-  const calendarOauthDir = path.join(homeDir, '.google-calendar-mcp');
-  if (fs.existsSync(calendarOauthDir)) {
-    mounts.push({
-      hostPath: calendarOauthDir,
-      containerPath: '/home/node/.google-calendar-mcp',
-      readonly: false,
-    });
-  }
-  const calendarTokenDir = path.join(homeDir, '.config', 'google-calendar-mcp');
-  if (fs.existsSync(calendarTokenDir)) {
-    mounts.push({
-      hostPath: calendarTokenDir,
-      containerPath: '/home/node/.config/google-calendar-mcp',
-      readonly: false,
-    });
-  }
 
   // nano-broker UDS socket (for API token requests from the container)
   const nanoBrokerDir = '/var/run/nano-broker';
