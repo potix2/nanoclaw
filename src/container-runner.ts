@@ -14,6 +14,7 @@ import {
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
+  NBCTL_PATH,
   TIMEZONE,
 } from './config.js';
 import { resolveGroupFolderPath, resolveGroupIpcPath } from './group-folder.js';
@@ -162,6 +163,33 @@ function buildVolumeMounts(
     containerPath: '/home/node/.claude',
     readonly: false,
   });
+
+  // nano-broker UDS socket (for API token requests from the container)
+  // macOS: $TMPDIR/nano-broker, Linux: $XDG_RUNTIME_DIR/nano-broker (fallback: /tmp/nano-broker)
+  const tmpDir = process.env.TMPDIR || '/tmp';
+  const xdgRuntimeDir = process.env.XDG_RUNTIME_DIR;
+  const nanoBrokerCandidates = [
+    path.join(tmpDir, 'nano-broker'),
+    ...(xdgRuntimeDir ? [path.join(xdgRuntimeDir, 'nano-broker')] : []),
+    '/tmp/nano-broker',
+  ];
+  const nanoBrokerDir = nanoBrokerCandidates.find((d) => fs.existsSync(d));
+  if (nanoBrokerDir) {
+    mounts.push({
+      hostPath: nanoBrokerDir,
+      containerPath: '/var/run/nano-broker',
+      readonly: false,
+    });
+  }
+
+  // nbctl CLI binary (nano-broker client for token requests)
+  if (fs.existsSync(NBCTL_PATH)) {
+    mounts.push({
+      hostPath: NBCTL_PATH,
+      containerPath: '/usr/local/bin/nbctl',
+      readonly: true,
+    });
+  }
 
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC
