@@ -10,6 +10,7 @@ const envConfig = readEnvFile([
   'ASSISTANT_NAME',
   'ASSISTANT_HAS_OWN_NUMBER',
   'NBCTL_PATH',
+  'NBCTL_CONTAINER_BIN_PATH',
 ]);
 
 export const ASSISTANT_NAME =
@@ -28,6 +29,14 @@ export const NBCTL_PATH =
   process.env.NBCTL_PATH ||
   envConfig.NBCTL_PATH ||
   path.join(HOME_DIR, '.local', 'bin', 'nbctl');
+
+// Container-native nbctl binary (Linux binary for macOS hosts)
+// On macOS, the host nbctl is a darwin binary and cannot run in Linux containers.
+// nano-broker's Step 3b installs a cross-compiled Linux binary here.
+export const NBCTL_CONTAINER_BIN_PATH =
+  process.env.NBCTL_CONTAINER_BIN_PATH ||
+  envConfig.NBCTL_CONTAINER_BIN_PATH ||
+  path.join(HOME_DIR, '.local', 'share', 'nano-broker', 'container-bin', 'nbctl');
 
 // Mount security: allowlist stored OUTSIDE project root, never mounted into containers
 export const MOUNT_ALLOWLIST_PATH = path.join(

@@ -78,4 +78,4 @@ fi
 - Tokens are short-lived and managed by the host's nano-broker daemon
 - User approval may be required (via Discord or CLI) — poll if pending
 - Use `nbctl policy trust` to temporarily skip approval for repeated operations
-- The socket is at /var/run/nano-broker/broker.sock inside the container
+- The socket is at /tmp/nano-broker/broker.sock inside the container
