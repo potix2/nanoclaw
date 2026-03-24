@@ -36,7 +36,14 @@ export const NBCTL_PATH =
 export const NBCTL_CONTAINER_BIN_PATH =
   process.env.NBCTL_CONTAINER_BIN_PATH ||
   envConfig.NBCTL_CONTAINER_BIN_PATH ||
-  path.join(HOME_DIR, '.local', 'share', 'nano-broker', 'container-bin', 'nbctl');
+  path.join(
+    HOME_DIR,
+    '.local',
+    'share',
+    'nano-broker',
+    'container-bin',
+    'nbctl',
+  );
 
 // Mount security: allowlist stored OUTSIDE project root, never mounted into containers
 export const MOUNT_ALLOWLIST_PATH = path.join(
