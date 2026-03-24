@@ -33,14 +33,40 @@ ls -la ${TMPDIR:-/tmp}/nano-broker/broker.sock 2>/dev/null || echo "Socket not f
 nbctl policy list
 ```
 
-If `nbctl` is not found, direct the user to install nano-broker first.
+If `nbctl` is not found, install it:
 
-If the socket doesn't exist, the nano-broker daemon may not be running. Suggest:
+**Quick install (CLI only — both macOS and Linux):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/potix2/nano-broker/main/deploy/install-nbctl.sh | bash
+```
 
-> Start the nano-broker daemon:
-> ```bash
-> nano-broker serve
-> ```
+**Full install (daemon + CLI + service):**
+Clone the nano-broker repository and run `bash deploy/install.sh`.
+
+If the socket doesn't exist, the nano-broker daemon may not be running:
+
+- **macOS**: `launchctl load ~/Library/LaunchAgents/dev.potix2.nano-broker.plist`
+- **Linux**: `sudo systemctl start nano-broker`
+
+If the plist/service is not installed, run `bash deploy/install.sh` in the nano-broker repository.
+
+### Check container binary (macOS only)
+
+On macOS, the host nbctl is a darwin binary and cannot run inside Linux containers.
+A cross-compiled Linux binary must be installed separately:
+
+```bash
+file ~/.local/share/nano-broker/container-bin/nbctl
+# Expected: ELF 64-bit LSB executable, ARM aarch64 ... statically linked
+```
+
+If not found, run Step 3b from nano-broker's setup:
+```bash
+cd /path/to/nano-broker
+# Follow Step 3b in .claude/skills/setup/SKILL.md
+```
+
+Or download directly from GitHub Releases (see nano-broker setup skill Step 3b).
 
 ## Phase 2: Apply Code Changes
 
@@ -119,7 +145,7 @@ Expected behavior:
 tail -f logs/nanoclaw.log | grep -i "nano-broker\|nbctl"
 ```
 
-Look for mount entries in container debug logs showing `/var/run/nano-broker` and `/usr/local/bin/nbctl`.
+Look for mount entries in container debug logs showing `/tmp/nano-broker` and `/usr/local/bin/nbctl`.
 
 ## Troubleshooting
 

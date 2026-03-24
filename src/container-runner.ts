@@ -14,6 +14,7 @@ import {
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
+  NBCTL_CONTAINER_BIN_PATH,
   NBCTL_PATH,
   TIMEZONE,
 } from './config.js';
@@ -177,15 +178,19 @@ function buildVolumeMounts(
   if (nanoBrokerDir) {
     mounts.push({
       hostPath: nanoBrokerDir,
-      containerPath: '/var/run/nano-broker',
+      containerPath: '/tmp/nano-broker',
       readonly: false,
     });
   }
 
   // nbctl CLI binary (nano-broker client for token requests)
-  if (fs.existsSync(NBCTL_PATH)) {
+  // On macOS, prefer the container-native (Linux) binary over the host (darwin) binary.
+  const nbctlBinary = fs.existsSync(NBCTL_CONTAINER_BIN_PATH)
+    ? NBCTL_CONTAINER_BIN_PATH
+    : NBCTL_PATH;
+  if (fs.existsSync(nbctlBinary)) {
     mounts.push({
-      hostPath: NBCTL_PATH,
+      hostPath: nbctlBinary,
       containerPath: '/usr/local/bin/nbctl',
       readonly: true,
     });
