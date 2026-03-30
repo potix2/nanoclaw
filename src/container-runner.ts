@@ -128,10 +128,38 @@ function buildVolumeMounts(
   fs.mkdirSync(groupSessionsDir, { recursive: true });
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
   if (!fs.existsSync(settingsFile)) {
+    // Inherit extraKnownMarketplaces from project root settings so all groups
+    // can access the same skill marketplaces (e.g. nano-skills)
+    let extraKnownMarketplaces: Record<string, unknown> | undefined;
+    const projectSettingsFile = path.join(
+      projectRoot,
+      '.claude',
+      'settings.json',
+    );
+    if (fs.existsSync(projectSettingsFile)) {
+      try {
+        const projectSettings = JSON.parse(
+          fs.readFileSync(projectSettingsFile, 'utf-8'),
+        ) as Record<string, unknown>;
+        if (
+          projectSettings.extraKnownMarketplaces &&
+          typeof projectSettings.extraKnownMarketplaces === 'object'
+        ) {
+          extraKnownMarketplaces =
+            projectSettings.extraKnownMarketplaces as Record<string, unknown>;
+        }
+      } catch {
+        // ignore parse errors — proceed without marketplace config
+      }
+    }
+
     fs.writeFileSync(
       settingsFile,
       JSON.stringify(
         {
+          ...(extraKnownMarketplaces !== undefined
+            ? { extraKnownMarketplaces }
+            : {}),
           env: {
             // Enable agent swarms (subagent orchestration)
             // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
