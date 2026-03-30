@@ -51,6 +51,84 @@ nbctl --json token request --service github --resource org/repo --permission rea
 - 2: pending (approval not yet given)
 - 3: denied (by policy or approver)
 
+## Pending-ticket deduplication (重複リクエスト防止)
+
+承認待ちチケットの重複を防ぐため、トークンリクエスト前に必ず `/workspace/group/pending-tickets.json` を確認する。
+
+### pending-ticket-helper.sh の使い方
+
+```bash
+source /workspace/group/pending-ticket-helper.sh
+
+# タスクを waiting_approval に更新するローカル関数
+_wait_approval() {
+  local NANO_HOOK_SECRET
+  NANO_HOOK_SECRET=$(grep NANO_HOOK_SECRET /workspace/project/groups/global/.secrets | cut -d= -f2)
+  curl -s -X PATCH "https://nano.potix2.dev/api/tasks/$TASK_ID" \
+    -H "X-Hook-Secret: $NANO_HOOK_SECRET" \
+    -H "Content-Type: application/json" \
+    -d '{"status":"waiting_approval"}'
+}
+
+# 1. 既存チケットを確認
+check_pending_ticket "github" "org/repo"
+# → $PENDING_TICKET_ID, $PENDING_POLL_STATUS, $PENDING_TOKEN が設定される
+
+if [ "$PENDING_POLL_STATUS" = "approved" ]; then
+  # 既存チケットが承認済み → $PENDING_TOKEN を使用
+  TOKEN="$PENDING_TOKEN"
+
+elif [ "$PENDING_POLL_STATUS" = "pending" ]; then
+  # まだ承認待ち → タスクを waiting_approval に更新して終了
+  _wait_approval && exit 0
+
+else
+  # チケットなし or エラー → 新規リクエスト
+  RESULT=$(nbctl --json token request \
+    --service github \
+    --resource org/repo \
+    --permission write \
+    --reason "task description" \
+    --no-wait)
+  STATUS=$(echo "$RESULT" | jq -r '.status')
+
+  if [ "$STATUS" = "approved" ]; then
+    TOKEN=$(echo "$RESULT" | jq -r '.token')
+  elif [ "$STATUS" = "pending" ]; then
+    TICKET_ID=$(echo "$RESULT" | jq -r '.ticket_id')
+    # チケットを保存してからタスクを waiting_approval に更新
+    save_pending_ticket "$TICKET_ID" "$TASK_ID" "github" "org/repo" "write" "task description"
+    _wait_approval && exit 0
+  else
+    echo "Token request denied or failed (status=$STATUS)" >&2
+    exit 1
+  fi
+fi
+
+# 2. TOKEN を使って作業を続行
+curl -H "Authorization: Bearer $TOKEN" https://api.github.com/repos/org/repo
+```
+
+### pending-tickets.json のフォーマット
+
+`/workspace/group/pending-tickets.json` はヘルパースクリプトが自動管理する:
+
+```json
+{
+  "tickets": [
+    {
+      "ticket_id": "550e8400-e29b-41d4-a716-446655440000",
+      "task_id": 42,
+      "created_at": "2026-03-30T10:00:00Z",
+      "service": "github",
+      "resource": "org/repo",
+      "permission": "write",
+      "reason": "task description"
+    }
+  ]
+}
+```
+
 ## Example: GitHub API access
 
 ```bash
@@ -79,3 +157,4 @@ fi
 - User approval may be required (via Discord or CLI) — poll if pending
 - Use `nbctl policy trust` to temporarily skip approval for repeated operations
 - The socket is at /tmp/nano-broker/broker.sock inside the container
+- **重複リクエスト防止**: 常に `/workspace/group/pending-tickets.json` を確認してから新規リクエストを送ること
