@@ -3,7 +3,11 @@ import {
   Events,
   GatewayIntentBits,
   Message,
+  MessageReaction,
+  PartialMessageReaction,
+  PartialUser,
   TextChannel,
+  User,
 } from 'discord.js';
 
 import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
@@ -21,6 +25,12 @@ export interface DiscordChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
   registeredGroups: () => Record<string, RegisteredGroup>;
+  /** Called when a user adds a reaction to a message (optional). */
+  onReactionAdd?: (
+    messageContent: string,
+    emoji: string,
+    channelJid: string,
+  ) => Promise<void>;
 }
 
 export class DiscordChannel implements Channel {
@@ -42,8 +52,40 @@ export class DiscordChannel implements Channel {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.GuildMessageReactions,
       ],
     });
+
+    // Reaction handler — forwards emoji reactions to the onReactionAdd callback
+    this.client.on(
+      Events.MessageReactionAdd,
+      async (
+        reaction: MessageReaction | PartialMessageReaction,
+        user: User | PartialUser,
+      ) => {
+        if (user.bot) return;
+        if (!this.opts.onReactionAdd) return;
+
+        // Fetch partials if needed (Discord may deliver partial objects for uncached messages)
+        try {
+          if (reaction.partial) await reaction.fetch();
+          if (reaction.message.partial) await reaction.message.fetch();
+        } catch (err) {
+          logger.warn({ err }, 'Discord: failed to fetch partial reaction/message');
+          return;
+        }
+
+        const emoji = reaction.emoji.name ?? '';
+        const messageContent = reaction.message.content ?? '';
+        const channelJid = `dc:${reaction.message.channelId}`;
+
+        try {
+          await this.opts.onReactionAdd(messageContent, emoji, channelJid);
+        } catch (err) {
+          logger.error({ err, emoji, channelJid }, 'Discord: onReactionAdd callback error');
+        }
+      },
+    );
 
     this.client.on(Events.MessageCreate, async (message: Message) => {
       // Ignore bot messages (including own)

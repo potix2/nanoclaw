@@ -30,6 +30,7 @@ import {
   ensureContainerRuntimeRunning,
 } from './container-runtime.js';
 import {
+  createTask,
   getAllChats,
   getAllRegisteredGroups,
   getAllSessions,
@@ -725,6 +726,78 @@ async function main(): Promise<void> {
       isGroup?: boolean,
     ) => storeChatMetadata(chatJid, timestamp, name, channel, isGroup),
     registeredGroups: () => registeredGroups,
+    onReactionAdd: async (
+      messageContent: string,
+      emoji: string,
+      channelJid: string,
+    ) => {
+      // Only handle the 🎧 emoji for notebooklm-audio auto-trigger
+      if (emoji !== '🎧') return;
+
+      // Extract research token from message: [research:YYYY-MM-DD:N]
+      const tokenMatch = messageContent.match(/\[research:([^\]]+)\]/);
+      if (!tokenMatch) return;
+      const token = tokenMatch[1];
+
+      // Look up article details from the research message index
+      const indexPath = '/workspace/group/outputs/research-message-index.json';
+      let article: { title: string; url: string; summary: string } | null = null;
+      try {
+        const raw = fs.readFileSync(indexPath, 'utf-8');
+        const index = JSON.parse(raw) as Record<
+          string,
+          { title: string; url: string; summary: string }
+        >;
+        article = index[token] ?? null;
+      } catch (err) {
+        logger.warn({ token, err }, 'onReactionAdd: could not read research-message-index.json');
+        return;
+      }
+
+      if (!article) {
+        logger.warn({ token }, 'onReactionAdd: research token not found in index');
+        return;
+      }
+
+      // Find the registered group for this channel to get the group folder
+      const group = registeredGroups[channelJid];
+      if (!group) {
+        logger.warn({ channelJid }, 'onReactionAdd: no registered group for channel JID');
+        return;
+      }
+
+      // Schedule a one-time notebooklm-audio task
+      const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const nextRun = new Date(Date.now() + 5000).toISOString();
+      const prompt = [
+        'notebooklm-audio スキルを実行してください。',
+        '',
+        '対象記事:',
+        `タイトル: ${article.title}`,
+        `URL: ${article.url}`,
+        `要約: ${article.summary}`,
+        '',
+        '記事を音声化して NotebookLM で解説を生成してください。',
+      ].join('\n');
+
+      createTask({
+        id: taskId,
+        group_folder: group.folder,
+        chat_jid: channelJid,
+        prompt,
+        script: null,
+        schedule_type: 'once',
+        schedule_value: nextRun,
+        context_mode: 'isolated',
+        next_run: nextRun,
+        status: 'active',
+        created_at: new Date().toISOString(),
+      });
+      logger.info(
+        { taskId, token, title: article.title },
+        'onReactionAdd: notebooklm-audio task scheduled',
+      );
+    },
   };
 
   // Create and connect all registered channels.
