@@ -741,7 +741,8 @@ async function main(): Promise<void> {
 
       // Look up article details from the research message index
       const indexPath = '/workspace/group/outputs/research-message-index.json';
-      let article: { title: string; url: string; summary: string } | null = null;
+      let article: { title: string; url: string; summary: string } | null =
+        null;
       try {
         const raw = fs.readFileSync(indexPath, 'utf-8');
         const index = JSON.parse(raw) as Record<
@@ -750,19 +751,28 @@ async function main(): Promise<void> {
         >;
         article = index[token] ?? null;
       } catch (err) {
-        logger.warn({ token, err }, 'onReactionAdd: could not read research-message-index.json');
+        logger.warn(
+          { token, err },
+          'onReactionAdd: could not read research-message-index.json',
+        );
         return;
       }
 
       if (!article) {
-        logger.warn({ token }, 'onReactionAdd: research token not found in index');
+        logger.warn(
+          { token },
+          'onReactionAdd: research token not found in index',
+        );
         return;
       }
 
       // Find the registered group for this channel to get the group folder
       const group = registeredGroups[channelJid];
       if (!group) {
-        logger.warn({ channelJid }, 'onReactionAdd: no registered group for channel JID');
+        logger.warn(
+          { channelJid },
+          'onReactionAdd: no registered group for channel JID',
+        );
         return;
       }
 

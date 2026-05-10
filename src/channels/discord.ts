@@ -71,7 +71,10 @@ export class DiscordChannel implements Channel {
           if (reaction.partial) await reaction.fetch();
           if (reaction.message.partial) await reaction.message.fetch();
         } catch (err) {
-          logger.warn({ err }, 'Discord: failed to fetch partial reaction/message');
+          logger.warn(
+            { err },
+            'Discord: failed to fetch partial reaction/message',
+          );
           return;
         }
 
@@ -82,7 +85,10 @@ export class DiscordChannel implements Channel {
         try {
           await this.opts.onReactionAdd(messageContent, emoji, channelJid);
         } catch (err) {
-          logger.error({ err, emoji, channelJid }, 'Discord: onReactionAdd callback error');
+          logger.error(
+            { err, emoji, channelJid },
+            'Discord: onReactionAdd callback error',
+          );
         }
       },
     );
