@@ -27,9 +27,7 @@ const PROJECT_ROOT = process.cwd();
 const HOME_DIR = process.env.HOME || os.homedir();
 
 export const NBCTL_PATH =
-  process.env.NBCTL_PATH ||
-  envConfig.NBCTL_PATH ||
-  path.join(HOME_DIR, '.local', 'bin', 'nbctl');
+  process.env.NBCTL_PATH || envConfig.NBCTL_PATH || path.join(HOME_DIR, '.local', 'bin', 'nbctl');
 
 // Container-native nbctl binary (Linux binary for macOS hosts)
 // On macOS, the host nbctl is a darwin binary and cannot run in Linux containers.
@@ -37,14 +35,7 @@ export const NBCTL_PATH =
 export const NBCTL_CONTAINER_BIN_PATH =
   process.env.NBCTL_CONTAINER_BIN_PATH ||
   envConfig.NBCTL_CONTAINER_BIN_PATH ||
-  path.join(
-    HOME_DIR,
-    '.local',
-    'share',
-    'nano-broker',
-    'container-bin',
-    'nbctl',
-  );
+  path.join(HOME_DIR, '.local', 'share', 'nano-broker', 'container-bin', 'nbctl');
 
 // Mount security: allowlist stored OUTSIDE project root, never mounted into containers
 export const MOUNT_ALLOWLIST_PATH = path.join(HOME_DIR, '.config', 'nanoclaw', 'mount-allowlist.json');
