@@ -63,6 +63,7 @@ import { startCliServer, stopCliServer } from './cli/socket-server.js';
 
 import type { ChannelAdapter, ChannelSetup } from './channels/adapter.js';
 import { initChannelAdapters, teardownChannelAdapters, getChannelAdapter } from './channels/channel-registry.js';
+import { startDiscordReactionListener, stopDiscordReactionListener } from './discord-reaction-listener.js';
 
 async function main(): Promise<void> {
   log.info('NanoClaw starting');
@@ -142,6 +143,10 @@ async function main(): Promise<void> {
     };
   });
 
+  // Standalone Discord reaction listener (🎧 → notebooklm-audio). Separate
+  // gateway connection — the Chat SDK bridge exposes no reaction events.
+  startDiscordReactionListener();
+
   // 4. Delivery adapter bridge — dispatches to channel adapters
   const deliveryAdapter = {
     async deliver(
@@ -207,6 +212,7 @@ async function shutdown(signal: string): Promise<void> {
   stopDeliveryPolls();
   stopHostSweep();
   await stopCliServer();
+  await stopDiscordReactionListener().catch((err) => log.error('Failed to stop Discord reaction listener', { err }));
   try {
     await teardownChannelAdapters();
   } finally {

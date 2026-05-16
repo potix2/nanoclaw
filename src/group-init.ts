@@ -6,30 +6,52 @@ import { ensureContainerConfig } from './db/container-configs.js';
 import { log } from './log.js';
 import type { AgentGroup } from './types.js';
 
-const DEFAULT_SETTINGS_JSON =
-  JSON.stringify(
-    {
-      env: {
-        CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-        CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-        CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
-      },
-      hooks: {
-        PreCompact: [
+const DEFAULT_SETTINGS = {
+  env: {
+    CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+    CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
+    CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
+  },
+  hooks: {
+    PreCompact: [
+      {
+        hooks: [
           {
-            hooks: [
-              {
-                type: 'command',
-                command: 'bun /app/src/compact-instructions.ts',
-              },
-            ],
+            type: 'command',
+            command: 'bun /app/src/compact-instructions.ts',
           },
         ],
       },
-    },
-    null,
-    2,
-  ) + '\n';
+    ],
+  },
+};
+
+/**
+ * Read `extraKnownMarketplaces` from the project-root `.claude/settings.json`
+ * so every agent group inherits the same skill marketplaces (e.g.
+ * `nano-skills`). Best-effort: returns undefined if root settings are missing,
+ * unparseable, or have no marketplaces. (v1 parity: commit 0b2f089 did this
+ * inside container-runner's per-group settings write; v2 does it here.)
+ */
+function readRootMarketplaces(): Record<string, unknown> | undefined {
+  try {
+    const rootSettings = path.join(path.dirname(GROUPS_DIR), '.claude', 'settings.json');
+    if (!fs.existsSync(rootSettings)) return undefined;
+    const parsed = JSON.parse(fs.readFileSync(rootSettings, 'utf-8')) as Record<string, unknown>;
+    const mk = parsed.extraKnownMarketplaces;
+    if (mk && typeof mk === 'object') return mk as Record<string, unknown>;
+  } catch {
+    // ignore — proceed without marketplace inheritance
+  }
+  return undefined;
+}
+
+/** Compose the per-group settings.json, inheriting root marketplaces. */
+function composeDefaultSettingsJson(): string {
+  const marketplaces = readRootMarketplaces();
+  const settings = marketplaces ? { extraKnownMarketplaces: marketplaces, ...DEFAULT_SETTINGS } : DEFAULT_SETTINGS;
+  return JSON.stringify(settings, null, 2) + '\n';
+}
 
 /**
  * Initialize the on-disk filesystem state for an agent group. Idempotent —
@@ -79,10 +101,11 @@ export function initGroupFilesystem(group: AgentGroup, opts?: { instructions?: s
 
   const settingsFile = path.join(claudeDir, 'settings.json');
   if (!fs.existsSync(settingsFile)) {
-    fs.writeFileSync(settingsFile, DEFAULT_SETTINGS_JSON);
+    fs.writeFileSync(settingsFile, composeDefaultSettingsJson());
     initialized.push('settings.json');
   } else {
     ensurePreCompactHook(settingsFile, initialized);
+    ensureExtraKnownMarketplaces(settingsFile, initialized);
   }
 
   // Skills directory — created empty here; symlinks are synced at spawn
@@ -129,5 +152,28 @@ function ensurePreCompactHook(settingsFile: string, initialized: string[]): void
     initialized.push('settings.json (added PreCompact hook)');
   } catch {
     // Don't break init if settings.json is malformed — it'll use whatever's there.
+  }
+}
+
+/**
+ * Patch an existing per-group settings.json to inherit
+ * `extraKnownMarketplaces` from the project-root settings if it's missing.
+ * Runs on every group init so pre-existing groups pick up the marketplace.
+ */
+function ensureExtraKnownMarketplaces(settingsFile: string, initialized: string[]): void {
+  try {
+    const marketplaces = readRootMarketplaces();
+    if (!marketplaces) return;
+
+    const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
+    if (settings.extraKnownMarketplaces && typeof settings.extraKnownMarketplaces === 'object') {
+      return; // already has it — leave the group's own value untouched
+    }
+
+    settings.extraKnownMarketplaces = marketplaces;
+    fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
+    initialized.push('settings.json (added extraKnownMarketplaces)');
+  } catch {
+    // Don't break init if settings.json is malformed.
   }
 }
